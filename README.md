@@ -12,7 +12,7 @@ HS item from the API and displays it.
 
 ## Demo
 
-[index.html](http://markmuir87.github.io/example-api-tariffs/)
+[index.html](http://ausftas.github.io/example-api-tariffs/)
 
 
 ## Additional Documentation
