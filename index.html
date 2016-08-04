@@ -3,7 +3,10 @@
 <head>
   <title>Tariffs Example</title>
   <meta charset="UTF-8">
-  <script src="https://code.jquery.com/jquery-2.2.0.min.js"></script>
+  <!-- jquery and friends -->
+  <script src="//ausftas.github.io/example-api-common/jquery-2.2.4.js"></script>
+  <script src="//ausftas.github.io/example-api-common/jquery-ui.js"></script>
+  <link rel="stylesheet" type="text/css" href="//ausftas.github.io/example-api-common/jquery-ui.css">
   <!-- look and feel -->
   <link rel="stylesheet" type="text/css" href="//ausftas.github.io/example-api-common/style.css">
   <link rel="stylesheet" type="text/css" href="http://blog.dfilimonov.com/github-ribbons-css/ribbons.css">
@@ -21,7 +24,7 @@
       Please wait while it loads.
     </div>
     <!-- ----------------------------------------------------------------- -->
-    <!-- Part 1: Selection of agreeement, country and heading -->
+    <!-- Part 1: Selection of agreement, country and heading -->
     <!-- ----------------------------------------------------------------- -->
     <div id="agreements" style="display: hide;">
       <h2>Select Heading</h2>
@@ -55,47 +58,56 @@
       var selectedHeading = null;
       
       // load and show a list of agreements
-      $(document).ready(function()
+      $.startExample(function(hierarchy_, agreements_)
       {
-        $.invoke('/tariffs/agreements', function(agreements_)
-        {
-          agreements = agreements_;
-          $('#agreementSelection').html(Object.keys(agreements).sort().map(function(agreement)
-          {
-            return '<option value="' + agreement + '">' + agreement + ' - ' + agreements[agreement].agreementFullName + '</option>';
-          }).join(''));
-          $('#agreementSelection').change();
-          $('#agreements').show();
-          $('#loading').hide();
-        });
+        hierarchy = hierarchy_;
+        agreements = agreements_;
         
-        $.invoke('/tariffs/hierarchy', function(hierarchy_)
+        // populate agreements selection
+        $('#agreementSelection').html(Object.keys(agreements).sort().map(function(agreement)
         {
-          hierarchy = hierarchy_;
-          $('#headingSelection').html(Object.keys(hierarchy).filter(function(hscode)
-          {
-            return hierarchy[hscode].type == 'heading';
-          }).sort().map(function(heading)
-          {
-            return '<option value="' + heading + '">' + heading + ' - ' + hierarchy[heading].description + '</option>';
-          }).join(''));
-          $('#headingSelection').change();
-          $('#headings').show();
-        });
+          return '<option value="' + agreement + '">' + agreement + ' - ' + agreements[agreement].agreementFullName + '</option>';
+        }).join(''));
+        $('#agreementSelection').change();
+        $('#agreements').show();
+        $('#loading').hide();
         
-      });
-      $('#agreementSelection').change(function()
-      {
-        selectedAgreement = $('#agreementSelection').val();
-        var countries = agreements[selectedAgreement].countries;
         
-        $('#countrySelection').html(Object.keys(countries).sort().map(function(country)
+        // populate hierarchy selection
+        $('#headingSelection').html(Object.keys(hierarchy).filter(function(hscode)
         {
-          return '<option value="' + country + '">' + country + ' - ' + countries[country].countryFullName + '</option>';
+          return hierarchy[hscode].type == 'heading';
+        }).sort().map(function(heading)
+        {
+          return '<option value="' + heading + '">' + heading + ' - ' + hierarchy[heading].description + '</option>';
         }).join(''));
         
-        $('#countrySelection').change();
-        $('#countries').show();
+        // load countries
+        $('#headingSelection').change();
+        $('#headings').show();
+      });
+
+      $('#agreementSelection').change(function()
+      {
+        // populate countries selection
+        selectedAgreement = $('#agreementSelection').val();
+        
+        
+        $.invoke('/tariffs/agreement/' + selectedAgreement, function(agreementData_)
+        {
+          console.log(agreementData_);
+          agreements[selectedAgreement] = agreementData_;
+        
+          var countries = agreements[selectedAgreement].countries;
+          
+          $('#countrySelection').html(Object.keys(countries).sort().map(function(country)
+          {
+            return '<option value="' + country + '">' + country + ' - ' + countries[country].countryFullName + '</option>';
+          }).join(''));
+          
+          $('#countrySelection').change();
+          $('#countries').show();
+        });
       });
       
       $('#countrySelection').change(function()
@@ -126,10 +138,13 @@
       
       $('#loadHeading').click(function()
       {
+        // load data
         $('#part1Selection').html(selectedAgreement + ' - ' + selectedCountry + ' - ' + selectedHeading);
-        $.invoke('/tariffs/heading/' + selectedHeading, function(headingData_)
+        $.invoke('/tariffs/' + selectedCountry + '/' + selectedAgreement + '/heading/' + selectedHeading, function(headingData_)
         {
           headingData = headingData_;
+          
+          // show loaded hierarchy
           showSelectedHeadingHierarchy();
           $('#hierarchyLoading').hide();
         });
@@ -137,56 +152,13 @@
         // $('#agreements').hide();
       });
       
-      function beautifyHSCode(code, showLabel)
-      {
-        var hscode = code.replace(/[^0-9]/g, '');
-        switch (hscode.length)
-        {
-        case 0:
-          return (showLabel ? 'Section ' : '') + code;
-        case 1:
-        case 2:
-          return (showLabel ? 'Chapter ' : '') + hscode;
-        case 3:
-        case 4:
-          return (showLabel ? 'Heading ' : '') + hscode;
-        case 5:
-        case 6:
-          return (showLabel ? 'Subheading ' : '') + hscode.substr(0, 4) + '.' + hscode.substr(4);
-        default:
-          return (showLabel ? 'Item ' : '') + hscode.substr(0, 4) + '.' + hscode.substr(4, 2) + '.' + hscode.substr(6);
-        }
-      }
-      
       function showSelectedHeadingHierarchy()
       {
-        var agreementCountrydata = headingData[selectedCountry][selectedAgreement];
+        var agreementCountrydata = headingData;
         
         // build a tree out of this data for user friendly presentation
         
-        var tree = {};
-        
-        Object.keys(agreementCountrydata).forEach(function(key)
-        {
-          tree[key] = tree[key] || {};
-          tree[key].key = key;
-        });
-
-        Object.keys(tree).sort().reverse().forEach(function(key)
-        {
-          var parent = key;
-          while (parent.length > 4)
-          {
-            parent = parent.substr(0, parent.length -1);
-            if (parent in tree)
-            {
-              tree[parent].children = tree[parent].children || {}
-              tree[parent].children[key] = tree[key];
-              delete tree[key];
-              break;
-            }
-          }
-        });
+        var tree = $.produceHierarchyTree(headingData);
         
         var html = '';
         html += '<ul>';
@@ -195,15 +167,14 @@
         {
           var html = '';
           html += '<li>';
-          if (object.key)
+          if (object.hscode)
           {
-            var item = agreementCountrydata[object.key];
-            if (item.tariffs)
+            if (object.tariffs)
             {
               html += '<a href="javascript:loadItem(\'' + object.key + '\')">';
             }
-            html += beautifyHSCode(object.key) + ' - ' + item.description;
-            if (item.tariffs)
+            html += $.beautifyHSCode(object.hscode) + ' - ' + object.description;
+            if (object.tariffs)
             {
               html += '</a>';
             }
@@ -280,9 +251,9 @@
       {
         var agreementData = agreements[selectedAgreement];
         var countryData = agreementData.countries[selectedCountry];
-        var hsData = headingData[selectedCountry][selectedAgreement][hsCode];
+        var hsData = headingData;
         
-        $('#hscode').html(beautifyHSCode(hsCode));
+        $('#hscode').html($.beautifyHSCode(hsCode));
         $('#description').html(hsData.description);
         $('#country').html(countryData.countryAcronym + ' - ' + countryData.countryFullName);
         $('#agreement').html(agreementData.agreementAcronym + ' - ' + agreementData.agreementFullName);
