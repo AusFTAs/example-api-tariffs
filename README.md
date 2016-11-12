@@ -1,7 +1,7 @@
 # HS Tariffs | Free Trade Agreement Portal API
 
-This example accesses the FTA Portal API through jQuery. It gets data of a
-HS item from the API and displays it.
+This example accesses the FTA Portal API. It gets data of HS items
+from the API and displays it.
 
 ## Source code
 
