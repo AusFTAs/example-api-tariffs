@@ -162,7 +162,7 @@
             
             headingSelection.html('').selectAll().data(headingsList)
               .enter()
-                .option(i => `${hierarchy[i].item} - ${hierarchy[i].description}`)
+                .option(i => `${i} - ${hierarchy[i].description}`)
                   .property('value', i => i);
 
             if (headingsList.indexOf(heading) === -1)
@@ -270,7 +270,7 @@
               addRow('#tariffSchedule', dates[index], rate);
             });
             
-            d3.select('#notes').html((countryData.tariffs.default.notes || '') + (hsdata.tariffs.default.notes || ''));
+            d3.select('#notes').html((countryData.tariffs && countryData.tariffs.default && countryData.tariffs.default.notes || '') + (hsdata.tariffs.default.notes || ''));
             
             d3.select('#psr').html('').a(TariffPSR.parse(hsdata.tariffs.productSpecificRules, agreementData.rulesOfOrigin).official)
               .attr('href', `/example-api-roo/#agreement=${agreement}&country=${country}&hs=${hscode}`);
