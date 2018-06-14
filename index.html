@@ -17,14 +17,14 @@
 </head>
 <body>
   <div id="header"></div>
-  
+
   <div id="example" class="content">
     <h1>API Tariffs Example</h1>
-  
+
     <div id="loading">
       Please wait while it loads.
     </div>
-    
+
     <!-- ----------------------------------------------------------------- -->
     <!-- Part 1: Selection of agreement, country and heading -->
     <!-- ----------------------------------------------------------------- -->
@@ -46,18 +46,18 @@
     <select id="headingSelection" style="max-width: 300px;">
     </select>
     </p>
-    
+
     <!-- ----------------------------------------------------------------- -->
     <!-- Part 2: Load heading data and display a hierarchy of subheading items -->
     <!-- ----------------------------------------------------------------- -->
-    
+
     <h2>Select HS Code With Tariff</h2>
     <div id="hscodeSelection"></div>
-    
+
     <!-- ----------------------------------------------------------------- -->
     <!-- Part 3: Display details of a particular product -->
     <!-- ----------------------------------------------------------------- -->
-    
+
     <h2>Product Details</h2>
     <h3>HS Code</h3>
     <p id="hscode">Loading...</p>
@@ -81,59 +81,60 @@
     <p id="notes">Loading...</p>
     <h3>Product Specific Rules</h3>
     <p id="psr">Loading...</p>
-    
+
     <h3>RAW DATA</h3>
     <pre id="raw1"></pre>
     <pre id="raw2"></pre>
     <pre id="raw3"></pre>
-    
+
     <script type="text/babel" data-presets="es2015" >
       // load and show a list of agreements
-      FTAPortalAPIExample.start(function(hierarchy, agreements)
+      FTAPortalAPIExample.start(async function(version, agreements)
       {
         function parameter(name, defaultValue='')
         {
           let value = window.location.hash.match(RegExp(`${name}=([^&]+)`, 'i'));
           return value && value[1] || defaultValue;
         }
-        
+
+        const hierarchy = await FTAPortalAPIExample.invoke('/products/hierarchy.json');
         let agreement = parameter('agreement', Object.keys(agreements)[0]);
         let country = parameter('country', Object.keys(agreements[Object.keys(agreements)[0]].countries)[0]);
         let heading = parameter('hs', '0101').substr(0, 4);
         let hscode = parameter('hs', '0101');
-        
+
         let agreementData = null;
         let headingData = null;
         let subheadingData = null;
-        
+
         function showAgreementCountryHeadingSelection()
         {
           function updateAgreementsSelection()
           {
             const agreementSelection = d3.select('#agreementSelection');
-            
+
             let agreementsList = Object.keys(agreements);
-            
+
             agreementSelection.html('').selectAll().data(agreementsList)
               .enter()
                 .option(i => agreements[i].agreementFullName)
                   .property('value', i => i);
-            
+
             agreementSelection.value(agreement);
-            
+
             updateCountrySelection();
-            
+
             agreementSelection.on('change', null).on('change', () => updateCountrySelection(agreement = agreementSelection.val()))
 
           }
-          
+
           function updateCountrySelection()
           {
             console.log('SELECT COUNTRY OF', agreement);
-            
+
             const countrySelection = d3.select('#countrySelection');
             let countriesList = Object.keys(agreements[agreement].countries);
-            
+
             countrySelection.html('').selectAll().data(countriesList)
               .enter()
                 .option(i => agreements[agreement].countries[i].countryFullName)
@@ -144,22 +145,22 @@
               country = countriesList[0];
             }
             countrySelection.value(country);
-            
+
             updateHeadingSelection();
-            
+
             countrySelection.on('change', null).on('change', () => updateHeadingSelection(country = countrySelection.val()))
 
           }
-          
-          
+
+
           function updateHeadingSelection()
           {
             console.log('SELECT HEADING OF', agreement, country);
-            
+
             const headingSelection = d3.select('#headingSelection');
-            
+
             let headingsList = Object.keys(hierarchy).filter(hs => hierarchy[hs].type === 'heading' && hierarchy[hs].countryAgreements.find(ca => ca.agreement === agreement && ca.country === country)).sort();
-            
+
             headingSelection.html('').selectAll().data(headingsList)
               .enter()
                 .option(i => `${i} - ${hierarchy[i].description}`)
@@ -171,17 +172,17 @@
             }
 
             headingSelection.value(heading);
-            
+
             updateHSCodeSelection();
-            
+
             headingSelection.on('change', null).on('change', () => updateHSCodeSelection(heading = headingSelection.val()));
 
           }
-          
+
           function updateHSCodeSelection()
           {
             console.log('SELECT HSCODE OF', agreement, country, heading);
-            
+
             function showResultChild(child)
             {
               let element = document.createElement('li');
@@ -204,50 +205,50 @@
             }
 
             const hscodeSelection = d3.select('#hscodeSelection');
-            
+
             Promise.all([
-              FTAPortalAPIExample.invoke(`/tariffs/agreement/${agreement}`),
-              FTAPortalAPIExample.invoke(`/tariffs/${country}/${agreement}/heading/${heading}`)
+              FTAPortalAPIExample.invoke(`/products/tariffs/${country}/${agreement}/common.json`),
+              FTAPortalAPIExample.invoke(`/products/tariffs/${country}/${agreement}/${heading}.json`)
               ])
               .then(data =>
             {
               agreementData = data[0];
               headingData = hierarchy[heading];
               subheadingData = data[1];
-              
+
               headingData.hscode = heading;
-              
+
               let headingHierarchy = FTAPortalAPIExample.stratifyHeadingDetails(headingData, subheadingData);
-              
+
               hscodeSelection.html('').ul().selectAll().data(headingHierarchy.children).enter().append(showResultChild);
-              
+
               if (subheadingData[hscode] === undefined || !subheadingData[hscode].tariffs)
               {
                 hscode = Object.keys(subheadingData).filter(f => subheadingData[f].tariffs)[0];
               }
-              
+
               updateProductDetails();
-              
+
             });
           }
-          
+
           function updateProductDetails()
           {
             console.log('SHOW PRODUCT OF', agreement, country, heading, hscode);
-            
+
             const hsdata = subheadingData[hscode];
-            
+
             let countryData = agreementData.countries[country];
-            
+
             d3.select('#hscode').html(FTAPortalAPIExample.uglifyHSCode(hscode, false, true));
-            
+
             d3.select('#description').html(hsdata.description);
-            
-            d3.select('#country').html(countryData.countryFullName);
-            
+
+            d3.select('#country').html(agreementData.countryFullName);
+
             d3.select('#agreement').html(agreementData.agreementFullName);
-           
-            let dates = countryData.tariffs.dates;
+
+            let dates = agreementData.tariffs.dates;
 
             function addRow(tbodyId, label, rate)
             {
@@ -264,40 +265,40 @@
             }
 
             let rates = hsdata.tariffs.default.rates;
-            
+
             rates.forEach(function(rate, index)
             {
               addRow('#tariffSchedule', dates[index], rate);
             });
-            
-            d3.select('#notes').html((countryData.tariffs && countryData.tariffs.default && countryData.tariffs.default.notes || '') + (hsdata.tariffs.default.notes || ''));
-            
+
+            d3.select('#notes').html((agreementData.tariffs && agreementData.tariffs.default && agreementData.tariffs.default.notes || '') + (hsdata.tariffs.default.notes || ''));
+
             d3.select('#psr').html('').a(TariffPSR.parse(hsdata.tariffs.productSpecificRules, agreementData.rulesOfOrigin).official)
               .attr('href', `/example-api-roo/#agreement=${agreement}&country=${country}&hs=${hscode}`);
-            
+
             d3.select('#raw3').html(JSON.stringify(headingData, null, 2));
-            d3.select('#raw2').html(JSON.stringify(countryData, null, 2));
+            d3.select('#raw2').html(JSON.stringify(agreementData, null, 2));
             d3.select('#raw1').html(JSON.stringify(hsdata, null, 2));
-            
+
             d3.select('#details').show();
             // d3.select('#hierarchy').hide();
-            
+
           }
-          
-          
+
+
           updateAgreementsSelection();
 
         }
-        
-        
+
+
         showAgreementCountryHeadingSelection();
         d3.select('#loading').hide();
       });
     </script>
   </div>
-  
+
   <div id="footer"></div>
-  
-  
+
+
 </body>
 </html>
